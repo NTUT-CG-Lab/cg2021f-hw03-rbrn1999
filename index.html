@@ -23,6 +23,7 @@
 
 	<script src="js/libs/ammo.wasm.js"></script>
 	<script src="scoreoutputer.min.js"></script>
+	<script src="FileSaver.min.js"></script>  
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 
 	<script>
@@ -34,8 +35,8 @@
 			so.addChild("讀取作業 2 儲存的座標點在眼睛上繪製出分割線", 1, true);
 			so.addChild("可選擇當下控制哪個虹膜", 1, true);
 			so.addChild("按滑鼠左鍵控制虹膜移動，右鍵停止", 2, true);
-			so.addChild("複製參數至對應目標參數", 2, false);
-			so.addChild("可儲存虹膜轉動角度", 1, false);
+			so.addChild("複製參數至對應目標參數", 2, true);
+			so.addChild("可儲存虹膜轉動角度", 1, true);
 
 			so.renderModal(
 				document.body,
@@ -72,6 +73,8 @@
 		let camera, camera2, camera3, camera4, camera5;
 
 		const splitLineGroup = new THREE.Group();
+		//leftEye: top bottom left right; rightEye: top bottom left right
+		let rotations = [new THREE.Euler(), new THREE.Euler(), new THREE.Euler(), new THREE.Euler(), new THREE.Euler(), new THREE.Euler(), new THREE.Euler(), new THREE.Euler()];
 
 		let irisIndex = 0;
 		let isMovingIris = false;
@@ -80,6 +83,7 @@
 		const modelFiles = ['models/mmd/kizunaai/kizunaai.pmx', 'models/mmd/Kokoro\ Amamiya/Kokoro\ Amamiya.pmx', 'models/mmd/るいのれ式物述有栖_配布用フォルダ/物述有栖.pmx'];
 		const inputFiles = ['input/kizunaAi.json', 'input/KokoroAmamiya.json', 'input/物述有栖.json'];
 		let modelIndex = 0;
+		let bound;
 
 		Ammo().then(function (AmmoLib) {
 
@@ -94,7 +98,7 @@
 
 			const container = document.createElement('div');
 			document.body.appendChild(container);
-			camera = new THREE.OrthographicCamera(0.5 * frustumSize * aspect / - 2, 0.5 * frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, 0.1, 1000);
+			camera = new THREE.OrthographicCamera(0.07 * frustumSize * aspect / - 2, 0.07 * frustumSize * aspect / 2, 0.14 * frustumSize / 2, 0.14 * frustumSize / - 2, 0.1, 100);
 			camera2 = new THREE.OrthographicCamera(0.25 * frustumSize * aspect / - 2, 0.25 * frustumSize * aspect / 2, 0.5 * frustumSize / 2, 0.5 * frustumSize / - 2, 0.1, 1000);
 			camera3 = new THREE.OrthographicCamera(0.25 * frustumSize * aspect / - 2, 0.25 * frustumSize * aspect / 2, 0.5 * frustumSize / 2, 0.5 * frustumSize / - 2, 0.1, 1000);
 			camera4 = new THREE.OrthographicCamera(0.25 * frustumSize * aspect / - 2, 0.25 * frustumSize * aspect / 2, 0.5 * frustumSize / 2, 0.5 * frustumSize / - 2, 0.1, 1000);
@@ -150,10 +154,15 @@
 				mouse.x =  e.clientX;
 				mouse.y = e.clientY;
 			});
-			window.addEventListener('contextmenu', (e) => { isMovingIris = false; e.preventDefault(); });
-			window.addEventListener('mousemove', onmousemove)
+			window.addEventListener('contextmenu', oncontextmenu);
+			window.addEventListener('mousemove', onmousemove);
 			//鏡頭控制
 
+		}
+
+		function oncontextmenu(e) {
+			isMovingIris = false;
+			e.preventDefault(); 
 		}
 
 		function onkeydown(e) {
@@ -162,13 +171,63 @@
 					if (irisIndex>0) irisIndex--;
 					break;
 				case 50:
-					if (irisIndex<=3) irisIndex++;
+					if (irisIndex<3) irisIndex++;
 					break;
 				case 65:
 					loadNextModel(false);
 					break;
 				case 68:
 					loadNextModel();
+					break;
+				case 81:
+					copyIrisRotation();
+					break;
+				case 83:
+					save();
+					break;
+				default:
+					console.log(THREE.MathUtils.radToDeg(rotations[0].x));
+					console.log(THREE.MathUtils.radToDeg(rotations[1].x));
+					console.log(THREE.MathUtils.radToDeg(rotations[2].y));
+					console.log(THREE.MathUtils.radToDeg(rotations[3].y));
+					break;
+			}
+		}
+
+		function save() {
+			class IrisRotation {
+				constructor(rotations) {
+					this.LXPA = THREE.MathUtils.radToDeg(rotations[0].x);
+					this.LXNA = THREE.MathUtils.radToDeg(rotations[1].x);
+					this.LYPA = THREE.MathUtils.radToDeg(rotations[2].y);
+					this.LYNA = THREE.MathUtils.radToDeg(rotations[3].y);
+					this.RXPA = THREE.MathUtils.radToDeg(rotations[4].x);
+					this.RXNA = THREE.MathUtils.radToDeg(rotations[5].x);
+					this.RYPA = THREE.MathUtils.radToDeg(rotations[6].y);
+					this.RYNA = THREE.MathUtils.radToDeg(rotations[7].y);
+				}
+			}
+
+			const object = new IrisRotation(rotations);
+			console.log(rotations);
+			console.log(object);
+			let json = JSON.stringify(object, null, 4);
+			let blob = new Blob([json], {type: "application/json"});
+			window.saveAs(blob, "model_data.json");
+		}
+		function copyIrisRotation() {
+			switch(irisIndex) {
+				case 0:
+					rotations[4].x = rotations[0].x;
+					break;
+				case 1:
+					rotations[5].x = rotations[1].x;
+					break;
+				case 2:
+					rotations[7].y = - rotations[2].y;
+					break;
+				case 3:
+					rotations[6].y = - rotations[3].y;
 					break;
 				default:
 					break;
@@ -179,16 +238,19 @@
 			if (isMovingIris) {
 				switch (irisIndex) {
 					case 0:
-						mesh.skeleton.bones[86].rotation.x = (e.clientY - mouse.y) / 50;
+						rotations[irisIndex].x = (e.clientY - mouse.y) / 70;
 						break;
 					case 1:
-						mesh.skeleton.bones[88].rotation.x = (e.clientY - mouse.y) / 50;
+						rotations[irisIndex].x = (e.clientY - mouse.y) / 70;
 						break;
 					case 2:
-						mesh.skeleton.bones[86].rotation.y = (e.clientX - mouse.x) / 50;
+						rotations[irisIndex].y = (e.clientX - mouse.x) / 70;
 						break;
 					case 3:
-						mesh.skeleton.bones[88].rotation.y = (e.clientX - mouse.x) / 50;
+						rotations[irisIndex].y = (e.clientX - mouse.x) / 70;
+						break;
+					default:
+						console.log("irisIndex overflow");
 						break;
 				}
 				
@@ -203,10 +265,10 @@
 
 			effect.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-			camera.left = 0.5 * frustumSize * aspect / - 2;
-			camera.right = 0.5 * frustumSize * aspect / 2;
-			camera.top = frustumSize / 2;
-			camera.bottom = - frustumSize / 2;
+			camera.left = 0.07 * frustumSize * aspect / - 2;
+			camera.right = 0.07 * frustumSize * aspect / 2;
+			camera.top = 0.14 * frustumSize / 2;
+			camera.bottom = - 0.14 * frustumSize / 2;
 			camera.updateProjectionMatrix();
 
 			camera2.left = 0.25 * frustumSize * aspect / - 2;
@@ -264,9 +326,10 @@
 
 		function loadBoundary() {
 			$.getJSON(inputFiles[modelIndex], function (boundary) {
+				bound = boundary;
 				let material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
 				let leftEye = boundary.leftEye;
-				const padding = 0.1;
+				const padding = 0;
 				for (let i = 0; i < 9; i++) {
 					const points = [];
 					points.push(new THREE.Vector3(leftEye.left * (1 - i / 8) + leftEye.right * (i / 8), leftEye.top + padding, 5));
@@ -314,20 +377,64 @@
 
 			effect.clear();
 
-			effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
-			effect.render(scene, camera);
+			// effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+			// effect.render(scene, camera);
+			camera.position.x = (bound.leftEye.left + bound.leftEye.right) / 2;
+			camera.position.y = (bound.leftEye.top + bound.leftEye.bottom) / 2;
 
+			
+			mesh.skeleton.bones[86].rotation.x = rotations[0].x;
+			mesh.skeleton.bones[86].rotation.y = rotations[0].y;
+			mesh.skeleton.bones[88].rotation.x = rotations[4].x;
+			mesh.skeleton.bones[88].rotation.y = rotations[4].y;
+			if (irisIndex == 0) {
+				splitLineGroup.visible = true; 
+				effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+				effect.render(scene, camera);
+			} else splitLineGroup.visible = false;
 			effect.setViewport(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2);
 			effect.render(scene, camera2);
+			
 
+			
+			mesh.skeleton.bones[86].rotation.x = rotations[1].x;
+			mesh.skeleton.bones[86].rotation.y = rotations[1].y;
+			mesh.skeleton.bones[88].rotation.x = rotations[5].x;
+			mesh.skeleton.bones[88].rotation.y = rotations[5].y;
+			if (irisIndex == 1) {
+				splitLineGroup.visible = true; 
+				effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+				effect.render(scene, camera);
+			} else splitLineGroup.visible = false;
 			effect.setViewport(SCREEN_WIDTH / 2 + SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2, SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2);
 			effect.render(scene, camera3);
+			
 
+			
+			mesh.skeleton.bones[86].rotation.x = rotations[2].x;
+			mesh.skeleton.bones[86].rotation.y = rotations[2].y;
+			mesh.skeleton.bones[88].rotation.x = rotations[6].x;
+			mesh.skeleton.bones[88].rotation.y = rotations[6].y;
+			if (irisIndex == 2) {
+				splitLineGroup.visible = true; 
+				effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+				effect.render(scene, camera);
+			} else splitLineGroup.visible = false;
 			effect.setViewport(SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2);
 			effect.render(scene, camera4);
-
+			
+			mesh.skeleton.bones[86].rotation.x = rotations[3].x;
+			mesh.skeleton.bones[86].rotation.y = rotations[3].y;
+			mesh.skeleton.bones[88].rotation.x = rotations[7].x;
+			mesh.skeleton.bones[88].rotation.y = rotations[7].y;
+			if (irisIndex == 3) {
+				splitLineGroup.visible = true; 
+				effect.setViewport(0, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+				effect.render(scene, camera);
+			} else splitLineGroup.visible = false;
 			effect.setViewport(SCREEN_WIDTH / 2 + SCREEN_WIDTH / 4, 0, SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2);
 			effect.render(scene, camera5);
+			
 		}
 	</script>
 
